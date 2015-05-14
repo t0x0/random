@@ -33,86 +33,24 @@ ffufp = open(ffupath, 'rb')
 imgfp = open(imgpath, 'wb')
 
 def readsecheader():
-	data = ffufp.read(4)
-	cbSize = struct.unpack("<L", data)[0]
-	data = ffufp.read(12)
-	signature = str(data)
-	if data != 'SignedImage ':
+	(cbSize, signature, dwChunkSizeInKb, dwAlgId, dwCatalogSize, dwHashTableSize) = struct.unpack("<L12sLLLL", ffufp.read(32))
+	if signature != 'SignedImage ':
 		sys.exit("Error: security header signature incorrect.")
-	data = ffufp.read(4)
-	dwChunkSizeInKb = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwAlgId = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwCatalogSize = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwHashTableSize = struct.unpack("<L", data)[0]
-	FFUSecHeader = SecurityHeader(cbSize, signature, dwChunkSizeInKb, dwAlgId, dwCatalogSize, dwHashTableSize)
-	return FFUSecHeader
+	return SecurityHeader(cbSize, signature, dwChunkSizeInKb, dwAlgId, dwCatalogSize, dwHashTableSize)
 
 def readimgheader():
-	data = ffufp.read(4)
-	cbSize = struct.unpack("<L", data)[0]
-	data = ffufp.read(12)
-	signature = str(data)
-	if data != 'ImageFlash  ':
+	(cbSize, signature, ManifestLength, dwChunkSize) = struct.unpack("<L12sLL", ffufp.read(24))
+	if signature != 'ImageFlash  ':
 		sys.exit("Error: image header signature incorrect.")
-	data = ffufp.read(4)
-	ManifestLength = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwChunkSize = struct.unpack("<L", data)[0]
-	FFUImgHeader = ImageHeader(cbSize, signature, ManifestLength, dwChunkSize)
-	return FFUImgHeader
+	return ImageHeader(cbSize, signature, ManifestLength, dwChunkSize)
 
 def readstoreheader():
-	data = ffufp.read(4)
-	dwUpdateType = struct.unpack("<L", data)[0]
-	data = ffufp.read(2)
-	MajorVersion = struct.unpack("<H", data)[0]
-	data = ffufp.read(2)
-	MinorVersion = struct.unpack("<H", data)[0]
-	data = ffufp.read(2)
-	FullFlashMajorVersion = struct.unpack("<H", data)[0]
-	data = ffufp.read(2)
-	FullFlashMinorVersion = struct.unpack("<H", data)[0]
-	data = ffufp.read(192)
-	szPlatformId = str(data)
-	data = ffufp.read(4)
-	dwBlockSizeInBytes = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwWriteDescriptorCount = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwWriteDescriptorLength = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwValidateDescriptorCount = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwValidateDescriptorLength = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwInitialTableIndex = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwInitialTableCount = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwFlashOnlyTableIndex = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwFlashOnlyTableCount = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwFinalTableIndex = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwFinalTableCount = struct.unpack("<L", data)[0]
-	FFUStoreHeader = StoreHeader(dwUpdateType, MajorVersion, MinorVersion, FullFlashMajorVersion, FullFlashMinorVersion, szPlatformId, dwBlockSizeInBytes, dwWriteDescriptorCount, dwWriteDescriptorLength, dwValidateDescriptorCount, dwValidateDescriptorLength, dwInitialTableIndex, dwInitialTableCount, dwFlashOnlyTableIndex, dwFlashOnlyTableCount, dwFinalTableIndex, dwFinalTableCount)
-	return FFUStoreHeader
+	(dwUpdateType, MajorVersion, MinorVersion, FullFlashMajorVersion, FullFlashMinorVersion, szPlatformId, dwBlockSizeInBytes, dwWriteDescriptorCount, dwWriteDescriptorLength, dwValidateDescriptorCount, dwValidateDescriptorLength, dwInitialTableIndex, dwInitialTableCount, dwFlashOnlyTableIndex, dwFlashOnlyTableCount, dwFinalTableIndex, dwFinalTableCount) = struct.unpack("<LHHHH192sLLLLLLLLLLL", ffufp.read(248))
+	return StoreHeader(dwUpdateType, MajorVersion, MinorVersion, FullFlashMajorVersion, FullFlashMinorVersion, szPlatformId, dwBlockSizeInBytes, dwWriteDescriptorCount, dwWriteDescriptorLength, dwValidateDescriptorCount, dwValidateDescriptorLength, dwInitialTableIndex, dwInitialTableCount, dwFlashOnlyTableIndex, dwFlashOnlyTableCount, dwFinalTableIndex, dwFinalTableCount)
 
 def readblockdataentry():
-	data = ffufp.read(4)
-	dwDiskAccessMethod = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwBlockIndex = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwLocationCount = struct.unpack("<L", data)[0]
-	data = ffufp.read(4)
-	dwBlockCount = struct.unpack("<L", data)[0]
-	CurrentBlockDataEntry = BlockDataEntry(dwDiskAccessMethod, dwBlockIndex, dwLocationCount, dwBlockCount)
-	return CurrentBlockDataEntry
+	(dwDiskAccessMethod, dwBlockIndex, dwLocationCount, dwBlockCount) = struct.unpack("<LLLL", ffufp.read(16))
+	return BlockDataEntry(dwDiskAccessMethod, dwBlockIndex, dwLocationCount, dwBlockCount)
 
 def gotoendofchunk(chunksizeinkb, position):
 	remainderofchunk = position%int(chunksizeinkb*1024)
@@ -120,38 +58,31 @@ def gotoendofchunk(chunksizeinkb, position):
 	ffufp.seek(distancetochunkend, 1)
 	return distancetochunkend
 
-print 'Reading Security Header'
 FFUSecHeader = readsecheader()
-print 'Passing Signed Catalog'
 ffufp.seek(FFUSecHeader.dwCatalogSize, 1)
-print 'Passing Hash Table'
 ffufp.seek(FFUSecHeader.dwHashTableSize, 1)
-print 'Going to end of chunk'
 gotoendofchunk(FFUSecHeader.dwChunkSizeInKb, ffufp.tell())
-print 'Reading Image Header'
 FFUImgHeader = readimgheader()
-print 'Passing Manifest'
 ffufp.seek(FFUImgHeader.ManifestLength, 1)
-print 'Going to end of chunk'
 gotoendofchunk(FFUSecHeader.dwChunkSizeInKb, ffufp.tell())
-print 'Reading Store Header'
 FFUStoreHeader = readstoreheader()
-print 'Skipping Validation Entries'
 ffufp.seek(FFUStoreHeader.dwValidateDescriptorLength, 1)
-# This will not work in any situation where the FFU has any sort of custom block layout.
-# I just didn't feel like deciphering the docs since it wasn't necessary.
-print 'Skipping Block Data Entries'
-ffufp.seek(FFUStoreHeader.dwWriteDescriptorLength, 1)
-print 'Going to end of chunk'
-gotoendofchunk(FFUSecHeader.dwChunkSizeInKb, ffufp.tell())
-# Not sure why I have to skip an extra chunk. Nothing in the docs mentions it.
-ffufp.seek(128*1024, 1)
-i = 0
-print 'Current location: ' + str(ffufp.tell())
-with ffufp as openfileobject:
-	for chunk in iter(partial(openfileobject.read, 1024*128), ''):
-		imgfp.write(chunk)
-		print str(i*128) + 'kb written\r',
-		i = i+1
+print 'Block data entries begin: ' + str(hex(ffufp.tell()))
+print 'Block data entries end: ' + str(hex(ffufp.tell() + FFUStoreHeader.dwWriteDescriptorLength))
+blockdataaddress = ffufp.tell() + FFUStoreHeader.dwWriteDescriptorLength
+blockdataaddress = blockdataaddress + (FFUSecHeader.dwChunkSizeInKb*1024)-(blockdataaddress%int((FFUSecHeader.dwChunkSizeInKb*1024)))
+blockdataaddress = blockdataaddress + (128*1024)
+print 'Block data chunks begin: ' + str(hex(blockdataaddress))
+iBlock = 0
+blockdataaddress = blockdataaddress - (1*FFUStoreHeader.dwBlockSizeInBytes)
+while iBlock < FFUStoreHeader.dwWriteDescriptorCount:
+		CurrentBlockDataEntry = readblockdataentry()
+		curraddress = ffufp.tell()
+		blockdataaddress = blockdataaddress + (CurrentBlockDataEntry.dwBlockIndex*FFUStoreHeader.dwBlockSizeInBytes)
+		ffufp.seek(blockdataaddress)
+		imgfp.write(ffufp.read(FFUStoreHeader.dwBlockSizeInBytes))
+		ffufp.seek(curraddress)
+		iBlock = iBlock + 1
+		print str(iBlock) + ' blocks, ' + str((iBlock*FFUStoreHeader.dwBlockSizeInBytes)/1024) + 'kb written\r',
 imgfp.close()
 ffufp.close()
