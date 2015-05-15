@@ -1,17 +1,13 @@
 #!/usr/bin/env python
 
-
 # MIT License, Copyright 2015 t0x0
 # Full text in 'LICENSE' file
 
-# This isn't very well written, or very pythonic. Hazards of 3AM coding absent caffeine.
 # May not work for any FFU files other than the Raspberry Pi 2 Windows 10 Insider Preview image.
 # Tested on the 2015-05-12 release image with Python 2.7.9
 # Use at your own risk, and let me know if it fails for your situation. me@t0x0.com
-# I'll try to fix it as I have time.
 
 import sys, os.path, struct, string
-from functools import partial
 from collections import namedtuple
 
 if len(sys.argv) < 2:
@@ -31,6 +27,7 @@ BlockDataEntry = namedtuple("BlockDataEntry", "dwDiskAccessMethod dwBlockIndex d
 
 ffufp = open(ffupath, 'rb')
 imgfp = open(imgpath, 'wb')
+logfp = open('ffu2img.log', 'w')
 
 def readsecheader():
 	(cbSize, signature, dwChunkSizeInKb, dwAlgId, dwCatalogSize, dwHashTableSize) = struct.unpack("<L12sLLLL", ffufp.read(32))
@@ -49,8 +46,8 @@ def readstoreheader():
 	return StoreHeader(dwUpdateType, MajorVersion, MinorVersion, FullFlashMajorVersion, FullFlashMinorVersion, szPlatformId, dwBlockSizeInBytes, dwWriteDescriptorCount, dwWriteDescriptorLength, dwValidateDescriptorCount, dwValidateDescriptorLength, dwInitialTableIndex, dwInitialTableCount, dwFlashOnlyTableIndex, dwFlashOnlyTableCount, dwFinalTableIndex, dwFinalTableCount)
 
 def readblockdataentry():
-	(dwDiskAccessMethod, dwBlockIndex, dwLocationCount, dwBlockCount) = struct.unpack("<LLLL", ffufp.read(16))
-	return BlockDataEntry(dwDiskAccessMethod, dwBlockIndex, dwLocationCount, dwBlockCount)
+	(dwLocationCount, dwBlockCount, dwDiskAccessMethod, dwBlockIndex) = struct.unpack("<LLLL", ffufp.read(16))
+	return BlockDataEntry(dwLocationCount, dwBlockCount, dwDiskAccessMethod, dwBlockIndex)
 
 def gotoendofchunk(chunksizeinkb, position):
 	remainderofchunk = position%int(chunksizeinkb*1024)
@@ -58,31 +55,53 @@ def gotoendofchunk(chunksizeinkb, position):
 	ffufp.seek(distancetochunkend, 1)
 	return distancetochunkend
 
+logfp.write('FFUSecHeader begin: ' + str(hex(ffufp.tell())) + '\n')
 FFUSecHeader = readsecheader()
+for key, val in FFUSecHeader._asdict().iteritems():
+	logfp.write(key + ' = ' + str(val) + '\n')
 ffufp.seek(FFUSecHeader.dwCatalogSize, 1)
 ffufp.seek(FFUSecHeader.dwHashTableSize, 1)
 gotoendofchunk(FFUSecHeader.dwChunkSizeInKb, ffufp.tell())
+
+logfp.write('FFUImgHeader begin: ' + str(hex(ffufp.tell())) + '\n')
 FFUImgHeader = readimgheader()
+for key, val in FFUImgHeader._asdict().iteritems():
+	logfp.write(key + ' = ' + str(val) + '\n')
 ffufp.seek(FFUImgHeader.ManifestLength, 1)
 gotoendofchunk(FFUSecHeader.dwChunkSizeInKb, ffufp.tell())
+
+logfp.write('FFUStoreHeader begin: ' + str(hex(ffufp.tell())) + '\n')
 FFUStoreHeader = readstoreheader()
+for key, val in FFUStoreHeader._asdict().iteritems():
+	logfp.write(key + ' = ' + str(val) + '\n')
 ffufp.seek(FFUStoreHeader.dwValidateDescriptorLength, 1)
+
 print 'Block data entries begin: ' + str(hex(ffufp.tell()))
+logfp.write('Block data entries begin: ' + str(hex(ffufp.tell())) + '\n')
 print 'Block data entries end: ' + str(hex(ffufp.tell() + FFUStoreHeader.dwWriteDescriptorLength))
+logfp.write('Block data entries end: ' + str(hex(ffufp.tell() + FFUStoreHeader.dwWriteDescriptorLength)) + '\n')
 blockdataaddress = ffufp.tell() + FFUStoreHeader.dwWriteDescriptorLength
 blockdataaddress = blockdataaddress + (FFUSecHeader.dwChunkSizeInKb*1024)-(blockdataaddress%int((FFUSecHeader.dwChunkSizeInKb*1024)))
-blockdataaddress = blockdataaddress + (128*1024)
+
+logfp.write('Block data chunks begin: ' + str(hex(blockdataaddress)) + '\n')
 print 'Block data chunks begin: ' + str(hex(blockdataaddress))
+
 iBlock = 0
-blockdataaddress = blockdataaddress - (1*FFUStoreHeader.dwBlockSizeInBytes)
+oldblockcount = 0
 while iBlock < FFUStoreHeader.dwWriteDescriptorCount:
-		CurrentBlockDataEntry = readblockdataentry()
-		curraddress = ffufp.tell()
-		blockdataaddress = blockdataaddress + (CurrentBlockDataEntry.dwBlockIndex*FFUStoreHeader.dwBlockSizeInBytes)
-		ffufp.seek(blockdataaddress)
-		imgfp.write(ffufp.read(FFUStoreHeader.dwBlockSizeInBytes))
-		ffufp.seek(curraddress)
-		iBlock = iBlock + 1
-		print str(iBlock) + ' blocks, ' + str((iBlock*FFUStoreHeader.dwBlockSizeInBytes)/1024) + 'kb written\r',
+	print('\r' + str(iBlock) + ' blocks, ' + str((iBlock*FFUStoreHeader.dwBlockSizeInBytes)/1024) + 'kb written                                '),
+	logfp.write('Block data entry from: ' + str(hex(ffufp.tell())) + '\n')
+	CurrentBlockDataEntry = readblockdataentry()
+	if abs(CurrentBlockDataEntry.dwBlockCount-oldblockcount) > 1:
+		print('\r' + str(iBlock) + ' blocks, ' + str((iBlock*FFUStoreHeader.dwBlockSizeInBytes)/1024) + 'kb written - Delay expected. Please wait.'),
+	oldblockcount = CurrentBlockDataEntry.dwBlockCount
+	for key, val in CurrentBlockDataEntry._asdict().iteritems():
+		logfp.write(key + ' = ' + str(val) + '\n')
+	curraddress = ffufp.tell()
+	ffufp.seek(blockdataaddress+(iBlock*FFUStoreHeader.dwBlockSizeInBytes))
+	imgfp.seek(CurrentBlockDataEntry.dwBlockCount*FFUStoreHeader.dwBlockSizeInBytes)
+	imgfp.write(ffufp.read(FFUStoreHeader.dwBlockSizeInBytes))
+	ffufp.seek(curraddress)
+	iBlock = iBlock + 1
 imgfp.close()
 ffufp.close()
