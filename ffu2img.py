@@ -105,7 +105,7 @@ while iBlock < FFUStoreHeader.dwWriteDescriptorCount:
 	imgfp.write(ffufp.read(FFUStoreHeader.dwBlockSizeInBytes))
 	ffufp.seek(curraddress)
 	iBlock = iBlock + 1
-	print '\nWrite complete.'
+print '\nWrite complete.'
 imgfp.close()
 ffufp.close()
 logfp.close()
