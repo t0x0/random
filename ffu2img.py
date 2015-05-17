@@ -32,13 +32,15 @@ logfp = open('ffu2img.log', 'w')
 def readsecheader():
 	(cbSize, signature, dwChunkSizeInKb, dwAlgId, dwCatalogSize, dwHashTableSize) = struct.unpack("<L12sLLLL", ffufp.read(32))
 	if signature != 'SignedImage ':
-		sys.exit("Error: security header signature incorrect.")
+		logfp.write('Exiting, incorrect signature: "' + signature '")
+		sys.exit("Error: security header signature incorrect: " + str(signature))
 	return SecurityHeader(cbSize, signature, dwChunkSizeInKb, dwAlgId, dwCatalogSize, dwHashTableSize)
 
 def readimgheader():
 	(cbSize, signature, ManifestLength, dwChunkSize) = struct.unpack("<L12sLL", ffufp.read(24))
 	if signature != 'ImageFlash  ':
-		sys.exit("Error: image header signature incorrect.")
+		logfp.write('Exiting, incorrect signature: "' + signature '")
+		sys.exit("Error: image header signature incorrect." + str(signature))
 	return ImageHeader(cbSize, signature, ManifestLength, dwChunkSize)
 
 def readstoreheader():
