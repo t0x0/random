@@ -11,7 +11,7 @@ import sys, os.path, struct, string
 from collections import namedtuple
 
 if len(sys.argv) < 2:
-	sys.exit("Error: no filenames provided. Usage: ffu2img.py input.ffu [output.img]\nWarning, will overwrite output file without prior permission.")
+	sys.exit("Error: no filenames provided. Usage: ffu2img.py3 input.ffu [output.img]\nWarning, will overwrite output file without prior permission.")
 ffupath = sys.argv[1]
 if len(sys.argv) == 3:
 	imgpath = sys.argv[2]
