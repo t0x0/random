@@ -8,6 +8,7 @@
 # Do not drink, recycled code in use. Code green. Feedback: me@t0x0.com
 
 # Prerequisite: pycrypto - https://www.dlitz.net/software/pycrypto/
+# Python 2.7.9 and pycrypto 2.6.1
 
 import sys, struct, string, httplib
 from Crypto.Cipher import AES
