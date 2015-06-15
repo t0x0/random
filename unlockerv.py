@@ -4,7 +4,7 @@
 # Full text in 'LICENSE' file
 
 # Will not work for any ransomware other than "Locker v*" by Poka Brightminds. 
-# Untested as no sample is available. Alpha code. Use at your own risk. 
+# Untested. Alpha code. Use at your own risk. 
 # Do not drink, recycled code in use. Code green. Feedback: me@t0x0.com
 
 # Prerequisite: pycrypto - https://www.dlitz.net/software/pycrypto/
