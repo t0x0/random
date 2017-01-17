@@ -88,6 +88,9 @@ blockdataaddress = blockdataaddress + (FFUSecHeader.dwChunkSizeInKb*1024)-(block
 logfp.write('Block data chunks begin: ' + str(hex(blockdataaddress)) + '\n')
 print('Block data chunks begin: ' + str(hex(blockdataaddress)))
 
+for i in range(FFUStoreHeader.dwInitialTableCount):
+	readblockdataentry()
+
 iBlock = 0
 oldblockcount = 0
 while iBlock < FFUStoreHeader.dwWriteDescriptorCount:
@@ -99,9 +102,14 @@ while iBlock < FFUStoreHeader.dwWriteDescriptorCount:
 	oldblockcount = CurrentBlockDataEntry.dwBlockCount
 	for key, val in CurrentBlockDataEntry._asdict().items():
 		logfp.write(key + ' = ' + str(val) + '\n')
+	if CurrentBlockDataEntry.dwLocationCount == 0 or CurrentBlockDataEntry.dwDiskAccessMethod == 2:
+		# TODO: fix dwDiskAccessMethod == 2 (seek from end of device)
+		# used on Dragonboard 410C for backup GPT
+		iBlock += 1
+		continue
 	curraddress = ffufp.tell()
 	ffufp.seek(blockdataaddress+(iBlock*FFUStoreHeader.dwBlockSizeInBytes))
-	imgfp.seek(CurrentBlockDataEntry.dwBlockCount*FFUStoreHeader.dwBlockSizeInBytes)
+	imgfp.seek(CurrentBlockDataEntry.dwBlockIndex*FFUStoreHeader.dwBlockSizeInBytes)
 	imgfp.write(ffufp.read(FFUStoreHeader.dwBlockSizeInBytes))
 	ffufp.seek(curraddress)
 	iBlock = iBlock + 1
